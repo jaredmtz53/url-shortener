@@ -37,7 +37,7 @@ jobs:
     steps:
       - name: Deploy to Railway
         run: |
-          npm install -g railway
+          npm install -g @railway/cli
           railway up --service=web --detach
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
