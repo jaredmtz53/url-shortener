@@ -3,7 +3,7 @@ import FlakeId from "flake-idgen";
 import dotenv from "dotenv";
 import { PrismaClient } from "@prisma/client";
 import limiter from "./middleware/rateLimiter.js";
-
+// testing CI/CD pipeline 🚀
 const prisma = new PrismaClient();
 dotenv.config();
 
