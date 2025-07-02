@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import { PrismaClient } from "@prisma/client";
 import limiter from "./middleware/rateLimiter.js";
 
+app.set("trust proxy", 1); // Trust first proxy for rate limiting
 const prisma = new PrismaClient();
 dotenv.config();
 
