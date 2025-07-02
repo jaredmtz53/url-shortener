@@ -2,7 +2,7 @@ import express from "express";
 import FlakeId from "flake-idgen";
 import dotenv from "dotenv";
 import { PrismaClient } from "@prisma/client";
-import limiter from "./middleware/rateLimiter.ts";
+import limiter from "./middleware/rateLimiter.js";
 
 const prisma = new PrismaClient();
 dotenv.config();
