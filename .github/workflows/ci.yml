@@ -35,7 +35,11 @@ jobs:
     if: github.ref == 'refs/heads/main'
 
     steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
       - name: Deploy to Railway
+        working-directory: .
         run: |
           npm install -g @railway/cli
           railway up --service=url-shortener --detach
