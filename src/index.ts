@@ -73,6 +73,10 @@ app.get("/:shortId", async(req,res) =>{
   if (!urlEntry) {
     return res.status(404).json({ error: "URL not found" });
   }
+  await prisma.url.update({
+    where: { shortId: shortId },
+    data: { clickCount: { increment: 1 } },
+  })
   return res.redirect(urlEntry.longUrl);
 })
 

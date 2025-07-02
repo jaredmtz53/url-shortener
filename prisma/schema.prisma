@@ -17,4 +17,5 @@ model Url {
   id       Int    @id @default(autoincrement())
   longUrl String @unique
   shortId String @unique
+  clickCount Int @default(0)
 }
