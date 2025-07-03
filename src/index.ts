@@ -43,8 +43,7 @@ app.post("/shorten", async (req, res) => {
   //check if URL already exists
   const existing = await prisma.url.findUnique({ where: { longUrl: url } });
   if (existing) {
-    const baseUrl = process.env.BASE_URL;
-    return res.status(200).json({ shortUrl: `${baseUrl}/${existing.shortId}` });
+    return res.status(200).json({ shortUrl: `/${existing.shortId}` });
   }
   // Otherwise create new short ID
   const idBuffer = flakeIdGen.next();
@@ -57,8 +56,7 @@ app.post("/shorten", async (req, res) => {
   // Keep only top 1000 entries in sorted set
   await redis.zremrangebyrank("clicks", 0, -1001);
 
-  const baseUrl = process.env.BASE_URL;
-  return res.status(201).json({ shortUrl: `${baseUrl}/${shortId}` });
+  return res.status(201).json({ shortUrl: `/${shortId}` });
 });
 
 app.get("/:shortId", async (req, res) => {
