@@ -3,7 +3,6 @@ import FlakeId from "flake-idgen";
 import dotenv from "dotenv";
 import { PrismaClient } from "@prisma/client";
 import limiter from "./middleware/rateLimiter.js";
-import redis from "./redis/client.js";
 
 const prisma = new PrismaClient();
 dotenv.config();
@@ -50,11 +49,8 @@ app.post("/shorten", async (req, res) => {
   const shortId = base62.encode(idBuffer);
   // Save to DB and cache
   await prisma.url.create({ data: { longUrl: url, shortId } });
-  await redis.set(shortId, url);
-  await redis.expire(shortId, 86400); // 1 day in seconds
-  await redis.zadd("clicks", 0, shortId);
+  
   // Keep only top 1000 entries in sorted set
-  await redis.zremrangebyrank("clicks", 0, -1001);
 
   return res.status(201).json({ shortUrl: `/${shortId}` });
 });
@@ -62,12 +58,7 @@ app.post("/shorten", async (req, res) => {
 app.get("/:shortId", async (req, res) => {
   const { shortId } = req.params;
   
-  const cachedUrl = await redis.get(shortId);
-  if (cachedUrl) {
-    // Increment click count in Redis
-    await redis.zincrby("clicks", 1, shortId);
-    return res.redirect(cachedUrl);
-  }
+  
 
   const urlEntry = await prisma.url.findUnique({
     where: { shortId: shortId },
@@ -79,9 +70,7 @@ app.get("/:shortId", async (req, res) => {
     where: { shortId: shortId },
     data: { clickCount: { increment: 1 } },
   });
-  await redis.set(shortId, urlEntry.longUrl);
-  await redis.expire(shortId, 86400); // Reset TTL upon access
-  await redis.zincrby("clicks", 1, shortId);
+ 
   return res.redirect(urlEntry.longUrl);
 });
 

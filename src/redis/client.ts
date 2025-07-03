@@ -6,6 +6,7 @@ if (!process.env.REDIS_URL) {
 }
 
 const redis = new Redis(process.env.REDIS_URL);
+console.log(redis.status)
 
 console.log("Connecting to Redis at:", process.env.REDIS_URL);
 export default redis;
