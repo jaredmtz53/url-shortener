@@ -3,7 +3,7 @@ import FlakeId from "flake-idgen";
 import dotenv from "dotenv";
 import { PrismaClient } from "@prisma/client";
 import limiter from "./middleware/rateLimiter.js";
-
+import redis from "./redis/client.js";
 const prisma = new PrismaClient();
 dotenv.config();
 
@@ -32,7 +32,6 @@ const PORT = process.env.PORT;
 
 app.use(express.json());
 app.use(limiter);
-
 app.post("/shorten", async (req, res) => {
   const { url } = req.body;
   // Validate URL format
@@ -49,7 +48,11 @@ app.post("/shorten", async (req, res) => {
   const shortId = base62.encode(idBuffer);
   // Save to DB and cache
   await prisma.url.create({ data: { longUrl: url, shortId } });
-  
+  await redis.zadd("clicks", 0, shortId);
+  const topIds = await redis.zrevrange("clicks", 1000, -1);
+  if (topIds.length > 0) {
+    await redis.zrem("clicks", ...topIds);
+  }
   // Keep only top 1000 entries in sorted set
 
   return res.status(201).json({ shortUrl: `/${shortId}` });
@@ -70,6 +73,8 @@ app.get("/:shortId", async (req, res) => {
     where: { shortId: shortId },
     data: { clickCount: { increment: 1 } },
   });
+  await redis.zincrby("clicks", 1, shortId);
+
  
   return res.redirect(urlEntry.longUrl);
 });
