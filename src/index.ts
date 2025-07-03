@@ -3,13 +3,7 @@ import FlakeId from "flake-idgen";
 import dotenv from "dotenv";
 import { PrismaClient } from "@prisma/client";
 import limiter from "./middleware/rateLimiter.js";
-// testing CI/CD pipeline 🚀
-// testing CI/CD pipeline 🚀
-// testing CI/CD pipeline 🚀
-// testing CI/CD pipeline 🚀
-// testing CI/CD pipeline 🚀
-
-
+import redis from "./redis/client.js";
 
 const prisma = new PrismaClient();
 dotenv.config();
@@ -42,31 +36,41 @@ app.use(limiter);
 
 app.post("/shorten", async (req, res) => {
   const { url } = req.body;
-
+  // Validate URL format
   if (!isValidUrl(url)) {
     return res.status(400).json({ error: "Invalid URL format" });
   }
-
-  const existing = await prisma.url.findUnique({
-    where: { longUrl: url },
-  });
+  //check if URL already exists
+  const existing = await prisma.url.findUnique({ where: { longUrl: url } });
   if (existing) {
-    return res.status(200).json({ shortId: existing.shortId });
+    const baseUrl = process.env.BASE_URL;
+    return res.status(200).json({ shortUrl: `${baseUrl}/${existing.shortId}` });
   }
-
+  // Otherwise create new short ID
   const idBuffer = flakeIdGen.next();
   const shortId = base62.encode(idBuffer);
-  await prisma.url.create({
-    data: {
-      longUrl: url,
-      shortId: shortId,
-    }
-  })
-  return res.status(201).json({ message: "URL is valid!" });
+  // Save to DB and cache
+  await prisma.url.create({ data: { longUrl: url, shortId } });
+  await redis.set(shortId, url);
+  await redis.expire(shortId, 86400); // 1 day in seconds
+  await redis.zadd("clicks", 0, shortId);
+  // Keep only top 1000 entries in sorted set
+  await redis.zremrangebyrank("clicks", 0, -1001);
+
+  const baseUrl = process.env.BASE_URL;
+  return res.status(201).json({ shortUrl: `${baseUrl}/${shortId}` });
 });
 
-app.get("/:shortId", async(req,res) =>{
-  const {shortId} = req.params;
+app.get("/:shortId", async (req, res) => {
+  const { shortId } = req.params;
+  
+  const cachedUrl = await redis.get(shortId);
+  if (cachedUrl) {
+    // Increment click count in Redis
+    await redis.zincrby("clicks", 1, shortId);
+    return res.redirect(cachedUrl);
+  }
+
   const urlEntry = await prisma.url.findUnique({
     where: { shortId: shortId },
   });
@@ -76,9 +80,12 @@ app.get("/:shortId", async(req,res) =>{
   await prisma.url.update({
     where: { shortId: shortId },
     data: { clickCount: { increment: 1 } },
-  })
+  });
+  await redis.set(shortId, urlEntry.longUrl);
+  await redis.expire(shortId, 86400); // Reset TTL upon access
+  await redis.zincrby("clicks", 1, shortId);
   return res.redirect(urlEntry.longUrl);
-})
+});
 
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
