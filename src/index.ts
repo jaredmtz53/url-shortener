@@ -3,7 +3,18 @@ import FlakeId from "flake-idgen";
 import dotenv from "dotenv";
 import { PrismaClient } from "@prisma/client";
 import limiter from "./middleware/rateLimiter.js";
-import redis from "./redis/client.js";
+import Redis from "ioredis";
+
+// Safely check that REDIS_URL is defined
+if (!process.env.REDIS_URL) {
+  throw new Error("Missing REDIS_URL environment variable");
+}
+
+const redis = new Redis(process.env.REDIS_URL);
+console.log(redis.status)
+
+console.log("Connecting to Redis at:", process.env.REDIS_URL);
+
 const prisma = new PrismaClient();
 dotenv.config();
 await redis.flushall()
@@ -70,7 +81,6 @@ app.get("/:shortId", async (req, res) => {
     where: { shortId: shortId },
     data: { clickCount: { increment: 1 } },
   });
-  await redis.zincrby("clicks", 1, urlEntry.shortId);
 
  
   return res.redirect(urlEntry.longUrl);
